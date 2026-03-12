@@ -1,20 +1,16 @@
-from flask import Flask, render_template
-import sqlite3
-from datetime import date
 import os
+import threading
+import sqlite3
+from flask import Flask, render_template
+from bot import run_bot  # your Telegram bot main function
 
 app = Flask(__name__)
 
-DB_PATH = "trades.db"
-
-
+# -------------------------
+# Initialize Database
 def init_db():
-    """
-    Create trades table if it doesn't exist
-    """
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect("trades.db")
     c = conn.cursor()
-
     c.execute("""
         CREATE TABLE IF NOT EXISTS trades (
             ticker TEXT,
@@ -25,72 +21,47 @@ def init_db():
             timestamp TEXT
         )
     """)
-
     conn.commit()
     conn.close()
 
+init_db()
 
+# -------------------------
+# Helper to save trade to DB
+def save_trade_to_db(trade):
+    conn = sqlite3.connect("trades.db")
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO trades (ticker, action, type, quantity, price, timestamp)
+        VALUES (?, ?, ?, ?, ?, datetime('now'))
+    """, (trade["ticker"], trade["action"], trade["type"], trade["quantity"], trade["price"]))
+    conn.commit()
+    conn.close()
+
+# -------------------------
+# Flask route for dashboard
 @app.route("/")
 def dashboard():
-
-    # Ensure database table exists
-    init_db()
-
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect("trades.db")
     c = conn.cursor()
-
-    today = date.today().isoformat()
-
-    c.execute(
-        "SELECT ticker, action, type, quantity, price, timestamp FROM trades WHERE date(timestamp)=?",
-        (today,)
-    )
-
-    trades = c.fetchall()
-
-    conn.close()
-
-    # Calculate daily P&L
-    pnl = 0
-    for trade in trades:
-        ticker = trade[0]
-        action = trade[1]
-        trade_type = trade[2]
-        quantity = trade[3]
-        price = trade[4]
-
-        if action == "SELL":
-            pnl += price * quantity
-        else:
-            pnl -= price * quantity
-
-    return render_template("dashboard.html", trades=trades, pnl=pnl)
-
-
-@app.route("/all")
-def all_trades():
-    """
-    Show all trades in database
-    """
-    init_db()
-
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    c.execute(
-        "SELECT ticker, action, type, quantity, price, timestamp FROM trades ORDER BY timestamp DESC"
-    )
-
+    c.execute("""
+        SELECT ticker, action, type, quantity, price, timestamp
+        FROM trades
+        ORDER BY timestamp DESC
+    """)
     trades = c.fetchall()
     conn.close()
+    return render_template("dashboard.html", trades=trades)
 
-    return render_template("dashboard.html", trades=trades, pnl="N/A")
+# -------------------------
+# Start Telegram bot in background
+def start_bot():
+    threading.Thread(target=run_bot, daemon=True).start()
 
+start_bot()
 
+# -------------------------
+# Run Flask app on Railway port
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-
-    # Initialize DB when app starts
-    init_db()
-
+    port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
