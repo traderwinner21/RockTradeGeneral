@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Daily Trade Dashboard</title>
+</head>
+<body>
+    <h1>Daily Trade Summary</h1>
+    <h2>Profit / Loss: {{ pnl }}</h2>
+    <table border="1">
+        <tr>
+            <th>Ticker</th>
+            <th>Action</th>
+            <th>Type</th>
+            <th>Quantity</th>
+            <th>Price</th>
+            <th>Timestamp</th>
+        </tr>
+        {% for t in trades %}
+        <tr>
+            <td>{{ t[0] }}</td>
+            <td>{{ t[1] }}</td>
+            <td>{{ t[2] }}</td>
+            <td>{{ t[3] }}</td>
+            <td>{{ t[4] }}</td>
+            <td>{{ t[5] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
